@@ -7,6 +7,7 @@ const Sidebar: React.FC = () => {
     <aside className="fixed left-0 top-[64px] w-64 h-[calc(100vh-64px)] bg-white dark:bg-gray-800 shadow-md transition-all duration-200 z-40 hidden md:block">
       <div className="px-6 py-8">
         <nav className="space-y-6">
+          {/* Main Section */}
           <div>
             <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold mb-3">Main</h3>
             <ul className="space-y-2">
@@ -72,13 +73,14 @@ const Sidebar: React.FC = () => {
               </li>
             </ul>
           </div>
-          
+
+          {/* Management Section */}
           <div>
             <h3 className="text-xs uppercase text-gray-500 dark:text-gray-400 font-semibold mb-3">Management</h3>
             <ul className="space-y-2">
               <li>
                 <NavLink 
-                  to="/students" 
+                  to="/manage-students"  // Updated route
                   className={({ isActive }) => 
                     `flex items-center space-x-3 py-2.5 px-3 rounded-lg transition-colors ${
                       isActive 
@@ -88,7 +90,7 @@ const Sidebar: React.FC = () => {
                   }
                 >
                   <Database className="w-5 h-5" />
-                  <span>Student Database</span>
+                  <span>Update Students</span> {/* Updated label */}
                 </NavLink>
               </li>
               <li>

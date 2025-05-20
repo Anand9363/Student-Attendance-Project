@@ -3,196 +3,155 @@ import * as faceapi from 'face-api.js';
 import { loadModels, detectFaces, recognizeFace } from '../utils/faceDetection';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types';
-import { Loader2, AlertCircle, ThumbsUp } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 interface FaceRecognitionProps {
   onRecognition?: (student: Student) => void;
   continuous?: boolean;
 }
 
-const FaceRecognition: React.FC<FaceRecognitionProps> = ({ 
-  onRecognition, 
-  continuous = false 
+const FaceRecognition: React.FC<FaceRecognitionProps> = ({
+  onRecognition,
+  continuous = false,
 }) => {
   const { students, markAttendance } = useAttendance();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
   const [isLoading, setIsLoading] = useState(true);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recognizedStudent, setRecognizedStudent] = useState<Student | null>(null);
-  const [recognitionSuccess, setRecognitionSuccess] = useState(false);
-  
-  // Load face-api models and start webcam
+
+  const recognizedIds = useRef<Set<string>>(new Set());
+  const lastRecognitionTime = useRef<Record<string, number>>({});
+
   useEffect(() => {
     const initialize = async () => {
       try {
         setIsLoading(true);
-        
-        // Load face-api.js models
         await loadModels();
-        
-        // Start webcam
-        const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-          video: {
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-            facingMode: 'user'
-          } 
+
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' },
         });
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
-        
+
+        if (videoRef.current) videoRef.current.srcObject = mediaStream;
         setStream(mediaStream);
         setError(null);
       } catch (err) {
-        console.error('Error initializing face recognition:', err);
-        setError('Failed to initialize face recognition. Please ensure you have granted camera permissions.');
+        console.error('Face recognition init error:', err);
+        setError('Failed to initialize. Grant camera permissions.');
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     initialize();
-    
-    // Cleanup
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stream?.getTracks().forEach(track => track.stop());
     };
   }, []);
-  
-  // Face detection loop
+
   useEffect(() => {
-    if (isLoading || error || !videoRef.current || students.length === 0 || !continuous) {
-      return;
-    }
-    
-    let animationFrameId: number;
+    if (isLoading || error || !videoRef.current || students.length === 0) return;
+
+    let intervalId: NodeJS.Timeout;
     let isProcessing = false;
-    
-    const detectFacesInterval = setInterval(() => {
-      if (isProcessing || !videoRef.current || videoRef.current.paused || videoRef.current.ended) {
-        return;
-      }
-      
+
+    intervalId = setInterval(async () => {
+      if (isProcessing || !videoRef.current) return;
       isProcessing = true;
-      
-      // Detect faces in the video stream
-      detectFaces(videoRef.current)
-        .then(faces => {
-          if (faces.length > 0) {
-            // Attempt to recognize each detected face
-            for (const face of faces) {
-              const recognized = recognizeFace(face.descriptor, students);
-              
-              if (recognized) {
-                setRecognizedStudent(recognized);
-                
-                // Mark attendance for the recognized student
-                markAttendance(recognized.id);
-                
-                // Call onRecognition callback if provided
-                if (onRecognition) {
-                  onRecognition(recognized);
-                }
-                
-                // Show success notification
-                setRecognitionSuccess(true);
-                setTimeout(() => setRecognitionSuccess(false), 3000);
-                
-                // Draw face detections on canvas
-                if (canvasRef.current && videoRef.current) {
-                  const displaySize = { 
-                    width: videoRef.current.videoWidth, 
-                    height: videoRef.current.videoHeight 
-                  };
-                  
-                  // Match the canvas display size to the video
-                  faceapi.matchDimensions(canvasRef.current, displaySize);
-                  
-                  // Draw the detection with labeled name
-                  const context = canvasRef.current.getContext('2d');
-                  if (context) {
-                    context.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-                    context.font = '16px Arial';
-                    context.fillStyle = '#00ff00';
-                    
-                    const box = face.detection.box;
-                    context.strokeStyle = '#00ff00';
-                    context.lineWidth = 2;
-                    context.strokeRect(box.x, box.y, box.width, box.height);
-                    
-                    const text = `${recognized.firstName} ${recognized.lastName}`;
-                    const textWidth = context.measureText(text).width;
-                    context.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    context.fillRect(box.x, box.y - 20, textWidth + 10, 20);
-                    context.fillStyle = '#00ff00';
-                    context.fillText(text, box.x + 5, box.y - 5);
-                  }
-                }
-              }
+
+      try {
+        const faces = await detectFaces(videoRef.current);
+        const video = videoRef.current!;
+        const canvas = canvasRef.current!;
+        const ctx = canvas.getContext('2d');
+        const { width, height } = video.getBoundingClientRect();
+
+        faceapi.matchDimensions(canvas, { width, height });
+        ctx?.clearRect(0, 0, width, height);
+
+        for (const face of faces) {
+          const matched = recognizeFace(face.descriptor, students);
+
+          if (matched) {
+            const now = Date.now();
+            const alreadyRecognized = recognizedIds.current.has(matched.id);
+            const lastSeen = lastRecognitionTime.current[matched.id] || 0;
+            const elapsed = now - lastSeen;
+
+            let statusText = '';
+            let color = '#00FF00'; // Green
+
+            // First recognition
+            if (!alreadyRecognized) {
+              recognizedIds.current.add(matched.id);
+              lastRecognitionTime.current[matched.id] = now;
+              await markAttendance(matched.id);
+              onRecognition?.(matched);
+              statusText = 'Marked as Present';
+              color = '#00FF00';
+            }
+            // Duplicate punch
+            else if (elapsed > 10000) {
+              lastRecognitionTime.current[matched.id] = now;
+              onRecognition?.(matched);
+              statusText = 'Duplicate Punch';
+              color = '#FF0000'; // Red
+            } else {
+              statusText = 'Already Marked';
+              color = '#FF0000';
+            }
+
+            // Draw bounding box and label
+            if (ctx) {
+              const box = face.detection.box;
+              const name = `${matched.firstName} ${matched.lastName}`;
+              const label = `${name} - ${statusText}`;
+              const textWidth = ctx.measureText(label).width;
+
+              // Draw box
+              ctx.strokeStyle = color;
+              ctx.lineWidth = 4;
+              ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+              // Background for label
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+              ctx.fillRect(box.x, box.y - 40, textWidth + 70, 35);
+
+              // Text
+              ctx.fillStyle = color;
+              ctx.font = 'bold 14px Arial';
+              ctx.fillText(label, box.x + 5, box.y - 20);
             }
           }
-        })
-        .catch(err => {
-          console.error('Error detecting faces:', err);
-        })
-        .finally(() => {
-          isProcessing = false;
-        });
-    }, 1000); // Process every 1 second
-    
-    return () => {
-      clearInterval(detectFacesInterval);
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
+        }
+      } catch (err) {
+        console.error('Detection error:', err);
+      } finally {
+        isProcessing = false;
       }
-    };
+    }, 1000);
+
+    return () => clearInterval(intervalId);
   }, [isLoading, error, students, continuous, markAttendance, onRecognition]);
-  
+
   return (
     <div className="relative">
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg p-6 h-96">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-2" />
-          <p className="text-gray-700 dark:text-gray-300">
-            Loading face recognition models...
-          </p>
+        <div className="flex flex-col items-center justify-center h-80 bg-gray-100 dark:bg-gray-800 p-4 rounded">
+          <Loader2 className="w-10 h-10 animate-spin text-blue-600" />
+          <p className="text-gray-600 dark:text-gray-300 mt-2">Loading face recognition models...</p>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg p-6 h-96">
-          <AlertCircle className="w-12 h-12 text-red-500 mb-2" />
-          <p className="text-red-600 dark:text-red-400">{error}</p>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Please check your camera permissions in your browser settings.
-          </p>
+        <div className="flex flex-col items-center justify-center h-80 bg-gray-100 dark:bg-gray-800 p-4 rounded">
+          <AlertCircle className="w-10 h-10 text-red-600" />
+          <p className="text-red-500 mt-2">{error}</p>
         </div>
       ) : (
-        <div className="relative bg-black rounded-lg overflow-hidden">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-auto"
-          />
-          <canvas 
-            ref={canvasRef} 
-            className="absolute top-0 left-0 w-full h-full" 
-          />
-          
-          {/* Recognition success notification */}
-          {recognitionSuccess && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full flex items-center space-x-2 animate-fade-in-out">
-              <ThumbsUp className="w-5 h-5" />
-              <span>Attendance marked for {recognizedStudent?.firstName} {recognizedStudent?.lastName}</span>
-            </div>
-          )}
+        <div className="relative bg-black rounded">
+          <video ref={videoRef} autoPlay muted playsInline className="w-full h-auto rounded" />
+          <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full pointer-events-none" />
         </div>
       )}
     </div>

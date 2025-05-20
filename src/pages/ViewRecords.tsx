@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAttendance } from '../context/AttendanceContext';
 import { Calendar, Download, Search, Filter, User, BookOpen } from 'lucide-react';
+import { Student } from '../types';
 
 const ViewRecords: React.FC = () => {
+  const navigate = useNavigate();
   const { students, attendanceRecords, getAttendanceByDate, exportAttendanceData } = useAttendance();
 
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredStudents, setFilteredStudents] = useState(students);
-  const [totalStudents, setTotalStudents] = useState(students.length);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [recordsForDate, setRecordsForDate] = useState<any[]>([]);
   const [presentStudents, setPresentStudents] = useState(0);
   const [absentStudents, setAbsentStudents] = useState(0);
-  const [recordsForDate, setRecordsForDate] = useState([]);
 
   useEffect(() => {
     const records = getAttendanceByDate(selectedDate);
@@ -35,10 +37,6 @@ const ViewRecords: React.FC = () => {
     setAbsentStudents(filtered.length - presentCount);
   }, [selectedDate, searchQuery, students, getAttendanceByDate]);
 
-  useEffect(() => {
-    setTotalStudents(students.length);
-  }, [students]);
-
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value);
   };
@@ -46,30 +44,33 @@ const ViewRecords: React.FC = () => {
   const handleExport = () => {
     const formattedRecords = recordsForDate.map(record => ({
       ...record,
-      date: new Date(record.timestamp).toLocaleDateString(),  // Format Date
-      time: new Date(record.timestamp).toLocaleTimeString(),  // Format Time
+      date: new Date(record.timestamp).toLocaleDateString(),
+      time: new Date(record.timestamp).toLocaleTimeString(),
     }));
-    
     exportAttendanceData(formattedRecords);
   };
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 mt-11">
-      {/* Header and Export */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Attendance Records</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">View and export attendance data by date</p>
-        </div>
-        <div className="mt-4 md:mt-0">
           <button
-            onClick={handleExport}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
+            onClick={() => navigate('/student-record')}
+            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
-            <Download className="w-5 h-5" />
-            <span>Export CSV</span>
+            Go to Student Record Page (Scan Face)
           </button>
         </div>
+        <button
+          onClick={handleExport}
+          className="mt-4 md:mt-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center space-x-2"
+        >
+          <Download className="w-5 h-5" />
+          <span>Export CSV</span>
+        </button>
       </div>
 
       {/* Filters */}
@@ -79,29 +80,25 @@ const ViewRecords: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select Date</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                </div>
+                <Calendar className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
                 <input
                   type="date"
                   value={selectedDate}
                   onChange={handleDateChange}
-                  className="pl-10 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 w-full"
+                  className="pl-10 px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search Student</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
+                <Search className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Name or ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 w-full"
+                  className="pl-10 px-4 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </div>
@@ -117,39 +114,9 @@ const ViewRecords: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Students</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{totalStudents}</h3>
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full">
-              <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Present</p>
-              <h3 className="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">{presentStudents}</h3>
-            </div>
-            <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
-              <User className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Absent</p>
-              <h3 className="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">{absentStudents}</h3>
-            </div>
-            <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full">
-              <User className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
-          </div>
-        </div>
+        <StatCard label="Total Students" value={students.length} icon={<BookOpen className="text-blue-600" />} bgColor="bg-blue-100 dark:bg-blue-900/30" />
+        <StatCard label="Present" value={presentStudents} icon={<User className="text-green-600" />} bgColor="bg-green-100 dark:bg-green-900/30" />
+        <StatCard label="Absent" value={absentStudents} icon={<User className="text-red-600" />} bgColor="bg-red-100 dark:bg-red-900/30" />
       </div>
 
       {/* Records Table */}
@@ -158,11 +125,11 @@ const ViewRecords: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Student</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Course</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Time</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                <TableHead title="Student" />
+                <TableHead title="ID" />
+                <TableHead title="Course" />
+                <TableHead title="Time" />
+                <TableHead title="Status" />
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -173,22 +140,18 @@ const ViewRecords: React.FC = () => {
                   const time = record ? new Date(record.timestamp).toLocaleTimeString() : '-';
                   return (
                     <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
                         {student.firstName} {student.lastName}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {student.studentId}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {student.course || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {time}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={isPresent
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
-                          : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'}>
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{student.studentId}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{student.course || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{time}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          isPresent
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
                           {isPresent ? 'Present' : 'Absent'}
                         </span>
                       </td>
@@ -209,5 +172,23 @@ const ViewRecords: React.FC = () => {
     </div>
   );
 };
+
+const StatCard = ({ label, value, icon, bgColor }: any) => (
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
+        <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{value}</h3>
+      </div>
+      <div className={`p-3 rounded-full ${bgColor}`}>{icon}</div>
+    </div>
+  </div>
+);
+
+const TableHead = ({ title }: { title: string }) => (
+  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+    {title}
+  </th>
+);
 
 export default ViewRecords;

@@ -7,7 +7,9 @@ import Dashboard from './pages/Dashboard';
 import RegisterStudent from './pages/RegisterStudent';
 import TakeAttendance from './pages/TakeAttendance';
 import ViewRecords from './pages/ViewRecords';
+import ManageStudents from './pages/ManageStudents';
 import NotFound from './pages/NotFound';
+import StudentRecord from './pages/StudentRecord';
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
               <Route path="/register" element={<RegisterStudent />} />
               <Route path="/attendance" element={<TakeAttendance />} />
               <Route path="/records" element={<ViewRecords />} />
+              <Route path="/manage-students" element={<ManageStudents />} />
+              <Route path="/student-record" element={<StudentRecord />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

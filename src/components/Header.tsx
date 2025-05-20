@@ -3,6 +3,7 @@ import { Menu, Moon, Sun, UserPlus, UserCheck, BarChart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 
+
 const Header: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const Header: React.FC = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  
   return (
     <header className="fixed w-full bg-white dark:bg-gray-800 shadow-md z-50 transition-colors duration-200">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -98,9 +100,23 @@ const Header: React.FC = () => {
                 setIsMobileMenuOpen(false);
               }}
             >
+              
               <BarChart className="w-5 h-5" />
               <span>Records</span>
             </button>
+                {/* Theme Toggle */}
+      <button
+        onClick={toggleTheme}
+        className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        aria-label="Toggle light/dark mode"
+      >
+        {theme === 'dark' ? (
+          <Sun className="w-5 h-5 text-yellow-400" />
+        ) : (
+          <Moon className="w-5 h-5 text-gray-800" />
+        )}
+      </button>
+      
           </div>
         </div>
       )}

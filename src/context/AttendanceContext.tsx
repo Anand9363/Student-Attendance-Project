@@ -37,6 +37,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   });
 
+  // Sync students with localStorage
   useEffect(() => {
     try {
       localStorage.setItem('students', JSON.stringify(students));
@@ -45,6 +46,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   }, [students]);
 
+  // Sync attendance records with localStorage
   useEffect(() => {
     try {
       localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords));
@@ -54,43 +56,26 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   }, [attendanceRecords]);
 
   const addStudent = (student: Student) => {
-    try {
-      // Validate student data
-      if (!student.id || !student.firstName || !student.lastName || !student.studentId) {
-        throw new Error('Invalid student data');
-      }
-
-      // Check for duplicate student ID
-      const isDuplicate = students.some(s => s.studentId === student.studentId);
-      if (isDuplicate) {
-        throw new Error('A student with this ID already exists');
-      }
-
-      setStudents(prev => {
-        const newStudents = [...prev, student];
-        // Immediately persist to localStorage
-        try {
-          localStorage.setItem('students', JSON.stringify(newStudents));
-        } catch (error) {
-          console.error('Error saving to localStorage:', error);
-        }
-        return newStudents;
-      });
-    } catch (error) {
-      console.error('Error adding student:', error);
-      throw error;
+    if (!student.id || !student.firstName || !student.lastName || !student.studentId) {
+      throw new Error('Invalid student data');
     }
+
+    // Prevent duplicates by studentId
+    if (students.some(s => s.studentId === student.studentId)) {
+      throw new Error('A student with this ID already exists');
+    }
+
+    setStudents(prev => [...prev, student]);
   };
 
   const updateStudent = (updatedStudent: Student) => {
-    setStudents(prev => 
-      prev.map(student => student.id === updatedStudent.id ? updatedStudent : student)
+    setStudents(prev =>
+      prev.map(student => (student.id === updatedStudent.id ? updatedStudent : student))
     );
   };
 
   const deleteStudent = (id: string) => {
     setStudents(prev => prev.filter(student => student.id !== id));
-    // Also remove associated attendance records
     setAttendanceRecords(prev => prev.filter(record => record.studentId !== id));
   };
 
@@ -106,19 +91,16 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         studentId,
         date: today,
         timestamp: new Date().toISOString(),
-        present: true
+        present: true,
       };
       setAttendanceRecords(prev => [...prev, newRecord]);
     }
   };
 
-  const getAttendanceByDate = (date: string) => {
-    return attendanceRecords.filter(record => record.date === date);
-  };
+  const getAttendanceByDate = (date: string) => attendanceRecords.filter(record => record.date === date);
 
-  const getAttendanceByStudent = (studentId: string) => {
-    return attendanceRecords.filter(record => record.studentId === studentId);
-  };
+  const getAttendanceByStudent = (studentId: string) =>
+    attendanceRecords.filter(record => record.studentId === studentId);
 
   const exportAttendanceData = (records: AttendanceRecord[]) => {
     const enrichedRecords = records.map(record => {
@@ -128,7 +110,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         timestamp: record.timestamp,
         studentId: record.studentId,
         studentName: student ? `${student.firstName} ${student.lastName}` : 'Unknown',
-        present: record.present
+        present: record.present,
       };
     });
 
@@ -139,9 +121,11 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
         new Date(record.timestamp).toLocaleTimeString(),
         record.studentId,
         record.studentName,
-        record.present ? 'Yes' : 'No'
-      ])
-    ].map(row => row.join(',')).join('\n');
+        record.present ? 'Yes' : 'No',
+      ]),
+    ]
+      .map(row => row.join(','))
+      .join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -164,18 +148,18 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   return (
-    <AttendanceContext.Provider 
-      value={{ 
-        students, 
-        attendanceRecords, 
-        addStudent, 
-        updateStudent, 
-        deleteStudent, 
-        markAttendance, 
-        getAttendanceByDate, 
-        getAttendanceByStudent, 
+    <AttendanceContext.Provider
+      value={{
+        students,
+        attendanceRecords,
+        addStudent,
+        updateStudent,
+        deleteStudent,
+        markAttendance,
+        getAttendanceByDate,
+        getAttendanceByStudent,
         exportAttendanceData,
-        clearAllData
+        clearAllData,
       }}
     >
       {children}
@@ -185,7 +169,7 @@ export const AttendanceProvider: React.FC<{ children: ReactNode }> = ({ children
 
 export const useAttendance = (): AttendanceContextType => {
   const context = useContext(AttendanceContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAttendance must be used within an AttendanceProvider');
   }
   return context;

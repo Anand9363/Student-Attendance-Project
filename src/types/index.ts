@@ -1,9 +1,12 @@
 export interface Student {
   id: string;
+  studentId: string;
   firstName: string;
   lastName: string;
-  studentId: string;
+  email: string;
+  phoneNumber: string;
   course: string;
+  profilePhoto?: string;
   faceDescriptors: number[][];
   registrationDate: string;
 }

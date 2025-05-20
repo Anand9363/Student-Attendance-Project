@@ -11,6 +11,7 @@ import {
   ArrowRight,
   X,
 } from 'lucide-react';
+import AttendanceChart from '../components/AttendanceChart';
 
 const Dashboard: React.FC = () => {
   const { students, attendanceRecords } = useAttendance();
@@ -18,6 +19,7 @@ const Dashboard: React.FC = () => {
   const [todayAttendance, setTodayAttendance] = useState(0);
   const [attendanceRate, setAttendanceRate] = useState(0);
   const [recentAttendance, setRecentAttendance] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -25,13 +27,11 @@ const Dashboard: React.FC = () => {
     setTodayAttendance(todayRecords.length);
 
     if (students.length > 0) {
-      const last7Days = Array(7)
-        .fill(0)
-        .map((_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          return date.toISOString().split('T')[0];
-        });
+      const last7Days = Array.from({ length: 7 }, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        return date.toISOString().split('T')[0];
+      });
 
       const last7DaysRecords = attendanceRecords.filter(record =>
         last7Days.includes(record.date)
@@ -44,20 +44,41 @@ const Dashboard: React.FC = () => {
           : 0;
 
       setAttendanceRate(Math.round(rate));
+
+      // Build chart data
+      const attendanceByDate: Record<string, { present: number; absent: number }> = {};
+      last7Days.forEach(date => {
+        const recordsOnDate = attendanceRecords.filter(r => r.date === date);
+        attendanceByDate[date] = {
+          present: recordsOnDate.length,
+          absent: students.length - recordsOnDate.length,
+        };
+      });
+
+      const formattedChartData = last7Days
+        .map(date => ({
+          date,
+          present: attendanceByDate[date]?.present || 0,
+          absent: attendanceByDate[date]?.absent || 0,
+        }))
+        .reverse(); // to show oldest to latest
+
+      setChartData(formattedChartData);
     }
 
-    const sortedRecords = Array.from(
-      new Map(
-        [...attendanceRecords]
-          .sort(
-            (a, b) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          )
-          .map(record => [`${record.studentId}_${record.timestamp}`, record])
-      ).values()
-    ).slice(0, 5);
+    // Sort and remove duplicate student entries (keep latest per student)
+    const uniqueRecentMap = new Map();
+    const sorted = [...attendanceRecords]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    setRecentAttendance(sortedRecords);
+    for (const record of sorted) {
+      if (!uniqueRecentMap.has(record.studentId)) {
+        uniqueRecentMap.set(record.studentId, record);
+      }
+      if (uniqueRecentMap.size === 5) break;
+    }
+
+    setRecentAttendance(Array.from(uniqueRecentMap.values()));
   }, [students, attendanceRecords]);
 
   const handleCancel = (id: string) => {
@@ -72,6 +93,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mt-11">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Dashboard</h1>
@@ -97,56 +119,16 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Students</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{students.length}</h3>
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-full">
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Today's Attendance</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{todayAttendance}</h3>
-            </div>
-            <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-full">
-              <Calendar className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Attendance Rate</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{attendanceRate}%</h3>
-            </div>
-            <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-full">
-              <Layers className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Total Records</p>
-              <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{attendanceRecords.length}</h3>
-            </div>
-            <div className="bg-orange-100 dark:bg-orange-900/30 p-3 rounded-full">
-              <Layers className="w-6 h-6 text-orange-600 dark:text-orange-400" />
-            </div>
-          </div>
-        </div>
+        <StatCard title="Total Students" value={students.length} icon={<Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />} iconBg="bg-blue-100 dark:bg-blue-900/30" />
+        <StatCard title="Today's Attendance" value={todayAttendance} icon={<Calendar className="w-6 h-6 text-green-600 dark:text-green-400" />} iconBg="bg-green-100 dark:bg-green-900/30" />
+        <StatCard title="Attendance Rate" value={`${attendanceRate}%`} icon={<Layers className="w-6 h-6 text-purple-600 dark:text-purple-400" />} iconBg="bg-purple-100 dark:bg-purple-900/30" />
+        <StatCard title="Total Records" value={attendanceRecords.length} icon={<Layers className="w-6 h-6 text-orange-600 dark:text-orange-400" />} iconBg="bg-orange-100 dark:bg-orange-900/30" />
       </div>
+
+      {/* Attendance Chart */}
+      <AttendanceChart data={chartData} />
 
       {/* Recent Attendance */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6">
@@ -194,9 +176,7 @@ const Dashboard: React.FC = () => {
                             <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                           </div>
                           <span className="font-medium text-gray-800 dark:text-gray-200">
-                            {student
-                              ? `${student.firstName} ${student.lastName}`
-                              : 'Unknown Student'}
+                            {student ? `${student.firstName} ${student.lastName}` : 'Unknown Student'}
                           </span>
                         </div>
                       </td>
@@ -228,7 +208,7 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Get Started Card */}
+      {/* Get Started Prompt */}
       {students.length === 0 && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-400 mb-2">
@@ -248,5 +228,27 @@ const Dashboard: React.FC = () => {
     </div>
   );
 };
+
+const StatCard = ({
+  title,
+  value,
+  icon,
+  iconBg,
+}: {
+  title: string;
+  value: string | number;
+  icon: React.ReactNode;
+  iconBg: string;
+}) => (
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 hover:shadow-lg transition">
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+        <h3 className="text-3xl font-bold text-gray-800 dark:text-white mt-1">{value}</h3>
+      </div>
+      <div className={`${iconBg} p-3 rounded-full`}>{icon}</div>
+    </div>
+  </div>
+);
 
 export default Dashboard;
