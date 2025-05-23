@@ -2,11 +2,22 @@ import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types';
 
+const courseOptions = [
+  'Computer Science Engineering',
+  'Information Technology',
+  'AI&DS',
+  'AIML',
+  'ECE',
+  'EEE',
+  'Others',
+];
+
 const ManageStudents: React.FC = () => {
   const { students = [], updateStudent, deleteStudent } = useAttendance();
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Omit<Student, 'id' | 'studentId' | 'faceDescriptors' | 'registrationDate'>>({
+  const [form, setForm] = useState<Omit<Student, 'id' | 'faceDescriptors' | 'registrationDate'>>({
+    studentId: '',
     firstName: '',
     lastName: '',
     email: '',
@@ -14,13 +25,12 @@ const ManageStudents: React.FC = () => {
     phoneNumber: '',
     profilePhoto: '',
   });
-  const [studentId, setStudentId] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const startEdit = (student: Student) => {
     setEditingId(student.id);
-    setStudentId(student.studentId);
     setForm({
+      studentId: student.studentId,
       firstName: student.firstName,
       lastName: student.lastName,
       email: student.email || '',
@@ -33,6 +43,7 @@ const ManageStudents: React.FC = () => {
   const cancelEdit = () => {
     setEditingId(null);
     setForm({
+      studentId: '',
       firstName: '',
       lastName: '',
       email: '',
@@ -40,10 +51,9 @@ const ManageStudents: React.FC = () => {
       phoneNumber: '',
       profilePhoto: '',
     });
-    setStudentId('');
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
@@ -67,7 +77,7 @@ const ManageStudents: React.FC = () => {
 
     updateStudent({
       id: editingId,
-      studentId,
+      studentId: form.studentId,
       firstName: form.firstName,
       lastName: form.lastName,
       email: form.email,
@@ -151,8 +161,14 @@ const ManageStudents: React.FC = () => {
           >
             {editingId === student.id ? (
               <div className="flex-1 space-y-2">
-                <p className="text-sm text-gray-600 dark:text-gray-300">Student ID: {studentId}</p>
-
+                <input
+                  type="text"
+                  name="studentId"
+                  placeholder="Student ID"
+                  value={form.studentId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 rounded border dark:bg-gray-700 dark:border-gray-600"
+                />
                 <input
                   type="text"
                   name="firstName"
@@ -177,14 +193,19 @@ const ManageStudents: React.FC = () => {
                   onChange={handleChange}
                   className="w-full px-3 py-2 rounded border dark:bg-gray-700 dark:border-gray-600"
                 />
-                <input
-                  type="text"
+                <select
                   name="course"
-                  placeholder="Course"
                   value={form.course}
                   onChange={handleChange}
                   className="w-full px-3 py-2 rounded border dark:bg-gray-700 dark:border-gray-600"
-                />
+                >
+                  <option value="">Select Course</option>
+                  {courseOptions.map(course => (
+                    <option key={course} value={course}>
+                      {course}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   name="phoneNumber"

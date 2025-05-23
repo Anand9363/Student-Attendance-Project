@@ -10,6 +10,8 @@ interface FaceRecognitionProps {
   continuous?: boolean;
 }
 
+
+
 const FaceRecognition: React.FC<FaceRecognitionProps> = ({
   onRecognition,
   continuous = false,
